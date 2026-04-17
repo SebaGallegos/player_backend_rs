@@ -4,8 +4,11 @@ use std::io::BufReader;
 
 pub fn play(file_path: &str) -> Result<(), String> {
     // find the default output device
-    let stream_handle = DeviceSinkBuilder::open_default_sink()
+    let mut stream_handle = DeviceSinkBuilder::open_default_sink()
         .map_err(|_| "Default audio hardware output device not found.")?;
+
+    // to prevent the log message "Stream dropped while still playing" when the player is dropped
+    stream_handle.log_on_drop(false);
 
     // create a new player
     let player = Player::connect_new(stream_handle.mixer());

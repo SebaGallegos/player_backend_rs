@@ -1,27 +1,59 @@
 mod audio_engine;
 
+use audio_engine::AudioCommand;
 use std::env;
+use std::io;
 use std::process;
+use std::sync::mpsc;    // to create communication channel between main thread and audio engine thread
 
 fn main() {
-    // 1. get args from command line
+    // 1. get argument: song path
     let args: Vec<String> = env::args().collect();
 
-    if args.len() != 2 {
-        eprintln!("Incorrect usage :(");    // to print errors
-        eprintln!("Usage: cargo run -- <path_to_audio_file>");  // instructions for dev, not production
+    if args.len() < 2 {
+        eprintln!("Usage: cargo run --release -- <song_path>");
         process::exit(1);
     }
 
-    let file_path = &args[1];
+    let song_path = args[1].clone();  // clone to get ownership of the string
+
+    // 2. create communication channel
+    // tx: this main thread's sender, used to send commands to the audio engine thread in FIFO order
+    // rx: the audio engine thread's receiver, used to receive commands from the main thread
+    let (tx, rx) = mpsc::channel();
+
+    // 3. initialize the audio engine in a separate thread
     println!("Initializing audio engine...");
-    println!("Playing: '{}'", file_path);
+    audio_engine::init_engine(song_path, rx);
 
-    // 2. call to audio engine to play the file
-    if let Err(e) = audio_engine::play(file_path) {
-        eprintln!("Error: {}", e);
-        process::exit(1);
+    // -- CLI --
+    println!("\n Reproductor de audio: ");
+    println!(" [p] Pausar");
+    println!(" [r] Reanudar");
+    println!(" [q] Salir");
+    println!("Escribe un comando...\n");
+
+    let mut input = String::new();
+
+    loop {
+        input.clear();
+        io::stdin().read_line(&mut input).unwrap();
+
+        match input.trim() {
+            "p" => {
+                tx.send(AudioCommand::Pause).unwrap();
+                println!("PAUSAR");
+            },
+            "r" => {
+                tx.send(AudioCommand::Play).unwrap();
+                println!("REANUDAR");
+            },
+            "q" => {
+                tx.send(AudioCommand::Stop).unwrap();
+                println!("stopping audio engine...");
+                break;
+            },
+            _ => println!("Comando no válido"),
+        }
     }
-
-    println!("Finished playing '{}'", file_path);
 }

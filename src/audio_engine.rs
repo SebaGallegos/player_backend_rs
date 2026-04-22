@@ -1,8 +1,10 @@
 use rodio::{Decoder, DeviceSinkBuilder, Player};
 use std::fs::File;
 use std::io::BufReader;
-use std::sync::mpsc::Receiver;  // for receiving messages (as command) from main thread for CLI and future GUI
+use std::sync::mpsc::{Receiver, RecvTimeoutError};  // for receiving messages (as command) from main thread for CLI and future GUI
 use std::thread;
+use std::time::Duration;    // to define a timeout
+use std::process;
 
 // audio commands will be sent from main thread (CLI or GUI)
 // to the audio engine thread via this channel
@@ -39,14 +41,30 @@ pub fn init_engine(song_path: String, command_receiver: Receiver<AudioCommand>) 
         // IMPORTANT
         // 5. engine while loop: listen for commands from main thread
         // and control the player accordingly
-        while let Ok(command) = command_receiver.recv() {
-            match command {
-                AudioCommand::Pause => player.pause(),
-                AudioCommand::Play => player.play(),
-                AudioCommand::Stop => {
-                    player.stop();
-                    break;  // exit the loop and end the thread
+        loop {
+            // wait a message with a timeout of 200ms
+            match command_receiver.recv_timeout(Duration::from_millis(200)){
+                // If this receives a command, execute the corresponding action on the player
+                Ok(command) => match command {
+                    AudioCommand::Pause => player.pause(),
+                    AudioCommand::Play => player.play(),
+                    AudioCommand::Stop => {
+                        player.stop();
+                        break;  // exit the loop and end the thread
+                    }
+                },
+                // If the timeout is reached without receiving a command,
+                // check if the player if still playing, if not, it means
+                // the song has finished, so we can exit the thread
+                Err(RecvTimeoutError::Timeout) => {
+                    if player.empty() {
+                        println!("Song finished, exiting audio engine...");
+                        process::exit(0);
+                    }
                 }
+                // If the channel is disconnected for other reasons,
+                // also exit the thread
+                Err(RecvTimeoutError::Disconnected) => break,
             }
         }
     });

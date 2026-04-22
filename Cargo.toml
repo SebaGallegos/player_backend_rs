@@ -1,8 +1,9 @@
 [package]
-name = "reproductor_backend"
+name = "player_backend_rs"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+id3 = "1.16.4"
 rodio = "0.22.2"
 

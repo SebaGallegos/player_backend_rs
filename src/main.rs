@@ -1,4 +1,6 @@
 mod audio_engine;
+#[path = "lib/metadata.rs"]
+mod metadata;
 
 use audio_engine::AudioCommand;
 use std::env;
@@ -17,6 +19,11 @@ fn main() {
 
     let song_path = args[1].clone();  // clone to get ownership of the string
 
+    // new feature: extract and display metadata
+    let metadata = metadata::extract_metadata(&song_path);
+
+    println!("\nNow playing: {} - {} ({} - {})\n", metadata.artist, metadata.title, metadata.album, metadata.year);
+
     // 2. create communication channel
     // tx: this main thread's sender, used to send commands to the audio engine thread in FIFO order
     // rx: the audio engine thread's receiver, used to receive commands from the main thread
@@ -27,11 +34,11 @@ fn main() {
     audio_engine::init_engine(song_path, rx);
 
     // -- CLI --
-    println!("\n Reproductor de audio: ");
-    println!(" [p] Pausar");
-    println!(" [r] Reanudar");
-    println!(" [q] Salir");
-    println!("Escribe un comando...\n");
+    println!("\nAudio player commands:");
+    println!(" [p] Pause");
+    println!(" [r] Resume");
+    println!(" [q] Quit");
+    println!("Enter a command: ");
 
     let mut input = String::new();
 
@@ -42,18 +49,18 @@ fn main() {
         match input.trim() {
             "p" => {
                 tx.send(AudioCommand::Pause).unwrap();
-                println!("PAUSAR");
+                println!("PAUSE");
             },
             "r" => {
                 tx.send(AudioCommand::Play).unwrap();
-                println!("REANUDAR");
+                println!("RESUME");
             },
             "q" => {
                 tx.send(AudioCommand::Stop).unwrap();
                 println!("stopping audio engine...");
                 break;
             },
-            _ => println!("Comando no válido"),
+            _ => println!("Invalid command."),
         }
     }
 }

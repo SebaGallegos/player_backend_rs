@@ -7,3 +7,6 @@ edition = "2024"
 id3 = "1.16.4"
 rodio = "0.22.2"
 
+[lib]
+crate-type=["rlib", "cdylib"]
+

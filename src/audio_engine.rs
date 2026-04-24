@@ -1,6 +1,6 @@
-use rodio::{Decoder, DeviceSinkBuilder, Player};
+use rodio::{Decoder, DeviceSinkBuilder, Player, Source};
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{self, BufReader, Write};
 use std::sync::mpsc::{Receiver, RecvTimeoutError};  // for receiving messages (as command) from main thread for CLI and future GUI
 use std::thread;
 use std::time::Duration;    // to define a timeout
@@ -32,11 +32,15 @@ pub fn init_engine(song_path: String, command_receiver: Receiver<AudioCommand>) 
         let file = File::open(&song_path)   // & to borrow the string, not take ownership
             .expect("Error: Cannot open audio file, please check the path."); // TODO: improve error message
         let reader = BufReader::new(file);
-        let source = Decoder::new(reader)
+        let source_song = Decoder::new(reader)
             .expect("Error: The file does not have a supported audio format or is corrupted.");
 
+        // TODO: add comment here
+        let total_duration = source_song.total_duration().unwrap_or(Duration::from_secs(0));
+        let total_sec = total_duration.as_secs();
+
         // 4. play the audio
-        player.append(source);
+        player.append(source_song);
 
         // IMPORTANT
         // 5. engine while loop: listen for commands from main thread
@@ -46,10 +50,17 @@ pub fn init_engine(song_path: String, command_receiver: Receiver<AudioCommand>) 
             match command_receiver.recv_timeout(Duration::from_millis(200)){
                 // If this receives a command, execute the corresponding action on the player
                 Ok(command) => match command {
-                    AudioCommand::Pause => player.pause(),
-                    AudioCommand::Play => player.play(),
+                    AudioCommand::Pause => {
+                        player.pause();
+                        println!();
+                    },
+                    AudioCommand::Play => {
+                        player.play();
+                        println!();
+                    },
                     AudioCommand::Stop => {
                         player.stop();
+                        println!();
                         break;  // exit the loop and end the thread
                     }
                 },
@@ -57,6 +68,17 @@ pub fn init_engine(song_path: String, command_receiver: Receiver<AudioCommand>) 
                 // check if the player if still playing, if not, it means
                 // the song has finished, so we can exit the thread
                 Err(RecvTimeoutError::Timeout) => {
+                    if !player.empty() && !player.is_paused() {
+                        let actual_second = player.get_pos().as_secs();
+
+                        print!("\r Progress: {:02}:{:02} / {:02}:{:02} [write a command: p/r/q] ",
+                            actual_second / 60, actual_second % 60,
+                            total_sec / 60, total_sec % 60
+                        );
+
+                        io::stdout().flush().unwrap();
+                    }
+
                     if player.empty() {
                         println!("Song finished, exiting audio engine...");
                         process::exit(0);

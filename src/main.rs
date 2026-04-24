@@ -1,8 +1,11 @@
-mod audio_engine;
-#[path = "lib/metadata.rs"]
-mod metadata;
+//mod audio_engine;
+//#[path = "lib/metadata.rs"]
+//mod metadata;
 
-use audio_engine::AudioCommand;
+use player_backend_rs::audio_engine::{self, AudioCommand};
+use player_backend_rs::metadata;
+
+//use audio_engine::AudioCommand;
 use std::env;
 use std::io;
 use std::process;

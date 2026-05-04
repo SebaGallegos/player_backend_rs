@@ -29,13 +29,13 @@ pub fn init_engine(song_path: String, command_receiver: Receiver<AudioCommand>) 
         let player = Player::connect_new(stream_handle.mixer());
 
         // 3. open the audio file
-        let file = File::open(&song_path)   // & to borrow the string, not take ownership
+        let file = File::open(&song_path)   // '&' to borrow the string, not take ownership
             .expect("Error: Cannot open audio file, please check the path."); // TODO: improve error message
         let reader = BufReader::new(file);
         let source_song = Decoder::new(reader)
             .expect("Error: The file does not have a supported audio format or is corrupted.");
 
-        // TODO: add comment here
+        // This calculates the total duration of the song, which is used to display the progress in the CLI
         let total_duration = source_song.total_duration().unwrap_or(Duration::from_secs(0));
         let total_sec = total_duration.as_secs();
 
@@ -69,13 +69,16 @@ pub fn init_engine(song_path: String, command_receiver: Receiver<AudioCommand>) 
                 // the song has finished, so we can exit the thread
                 Err(RecvTimeoutError::Timeout) => {
                     if !player.empty() && !player.is_paused() {
+                        // This gets the current position of the player in seconds and prints the progress in the CLI
                         let actual_second = player.get_pos().as_secs();
 
+                        // \r: delete the current line and print the new progress, without creating a new line
                         print!("\r Progress: {:02}:{:02} / {:02}:{:02} [write a command: p/r/q] ",
                             actual_second / 60, actual_second % 60,
                             total_sec / 60, total_sec % 60
                         );
-
+                        
+                        // flush the output to ensure the progress is printed immediately
                         io::stdout().flush().unwrap();
                     }
 

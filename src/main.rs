@@ -46,11 +46,9 @@ fn main() {
         match input.trim() {
             "p" => {
                 tx.send(AudioCommand::Pause).unwrap();
-                println!("PAUSE");
             },
             "r" => {
                 tx.send(AudioCommand::Play).unwrap();
-                println!("RESUME");
             },
             "q" => {
                 tx.send(AudioCommand::Stop).unwrap();

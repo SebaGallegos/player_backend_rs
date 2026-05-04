@@ -14,6 +14,27 @@ pub enum AudioCommand {
     Stop,
 }
 
+// fn render_status(actual_sec: u64, total_sec: u64, status: &str)
+// this renders the progress of the song in the CLI and his current status,
+// flushing stdout to update the progress in real time
+// without creating a new line of each update
+fn render_status(actual_sec: u64, total_sec: u64, status: &str) {
+    print!(
+        "\r Progress: {:02}:{:02} / {:02}:{:02} [{}] [write a command: p/r/q] ",
+        actual_sec / 60,
+        actual_sec % 60,
+        total_sec / 60,
+        total_sec % 60,
+        status
+    );
+
+    // (:) oh, unwrap() triggers a panic if the flush fails
+    // well, I changes it to expect()
+    // to provide a custom message in case of error
+    // and "panic" is a very scary word too :D
+    io::stdout().flush().expect("Error: Failed to flush stdout.");
+}
+
 pub fn init_engine(song_path: String, command_receiver: Receiver<AudioCommand>) {
     // thread: run audio engine in a separate thread
     // move: move song_path and command_receiver ownership into the thread
@@ -52,15 +73,16 @@ pub fn init_engine(song_path: String, command_receiver: Receiver<AudioCommand>) 
                 Ok(command) => match command {
                     AudioCommand::Pause => {
                         player.pause();
-                        println!();
+                        render_status(player.get_pos().as_secs(), total_sec, "PAUSED");
                     },
                     AudioCommand::Play => {
                         player.play();
-                        println!();
+                        render_status(player.get_pos().as_secs(), total_sec, "PLAYING");
                     },
                     AudioCommand::Stop => {
                         player.stop();
-                        println!();
+                        print!("\r");
+                        io::stdout().flush().expect("Error: Failed to flush stdout.");
                         break;  // exit the loop and end the thread
                     }
                 },
@@ -68,22 +90,17 @@ pub fn init_engine(song_path: String, command_receiver: Receiver<AudioCommand>) 
                 // check if the player if still playing, if not, it means
                 // the song has finished, so we can exit the thread
                 Err(RecvTimeoutError::Timeout) => {
-                    if !player.empty() && !player.is_paused() {
-                        // This gets the current position of the player in seconds and prints the progress in the CLI
-                        let actual_second = player.get_pos().as_secs();
-
-                        // \r: delete the current line and print the new progress, without creating a new line
-                        print!("\r Progress: {:02}:{:02} / {:02}:{:02} [write a command: p/r/q] ",
-                            actual_second / 60, actual_second % 60,
-                            total_sec / 60, total_sec % 60
-                        );
-                        
-                        // flush the output to ensure the progress is printed immediately
-                        io::stdout().flush().unwrap();
+                    if !player.empty() {
+                        // get the current position of the song in seconds
+                        let actual_sec = player.get_pos().as_secs();
+                        // get the current status of the player
+                        let status = if player.is_paused() { "PAUSED" } else { "PLAYING" };
+                        // finally render the status in the CLI
+                        render_status(actual_sec, total_sec, status);
                     }
 
                     if player.empty() {
-                        println!("Song finished, exiting audio engine...");
+                        println!("\nSong finished, exiting audio engine...");
                         process::exit(0);
                     }
                 }

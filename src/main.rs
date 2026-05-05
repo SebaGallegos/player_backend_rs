@@ -2,9 +2,11 @@ use player_backend_rs::audio_engine::{self, AudioCommand};
 use player_backend_rs::metadata;
 
 use std::env;
-use std::io;
 use std::process;
 use std::sync::mpsc;    // to create communication channel between main thread and audio engine thread
+
+use crossterm::event::{read, Event, KeyCode, KeyEventKind};
+use crossterm::terminal::{enable_raw_mode, disable_raw_mode};
 
 fn main() {
     // 1. get argument: song path
@@ -37,25 +39,28 @@ fn main() {
     println!(" [r] Resume");
     println!(" [q] Quit\n");
 
-    let mut input = String::new();
+    // to enable the crossterm raw mode
+    // this allows us to read user input in real time without Enter key confirmation
+    enable_raw_mode().expect("Failed to enable raw mode.");
 
+    // new: use crossterm to manage user input in real time
     loop {
-        input.clear();
-        io::stdin().read_line(&mut input).unwrap();
+        if let Event::Key(key) = read().unwrap() {
+            if key.kind != KeyEventKind::Press {
+                continue;
+            }
 
-        match input.trim() {
-            "p" => {
-                tx.send(AudioCommand::Pause).unwrap();
-            },
-            "r" => {
-                tx.send(AudioCommand::Play).unwrap();
-            },
-            "q" => {
-                tx.send(AudioCommand::Stop).unwrap();
-                println!("stopping audio engine...");
-                break;
-            },
-            _ => println!("Invalid command."),
+            match key.code {
+                KeyCode::Char('p') => { tx.send(AudioCommand::Pause).unwrap(); }
+                KeyCode::Char('r') => { tx.send(AudioCommand::Play).unwrap(); }
+                KeyCode::Char('q') => {
+                    tx.send(AudioCommand::Stop).unwrap();
+                    disable_raw_mode().expect("Failed to disable raw mode.");
+                    println!("\n\nstopping audio engine...");
+                    break;
+                }
+                _ => {}
+            }
         }
     }
 }

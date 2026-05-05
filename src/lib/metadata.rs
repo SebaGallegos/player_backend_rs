@@ -1,4 +1,5 @@
-use id3::{Tag, TagLike};
+use lofty::prelude::{Accessor, TaggedFileExt};
+use lofty::probe::Probe;
 
 // Struct to hold metadata information
 pub struct SongMetadata {
@@ -12,22 +13,45 @@ pub struct SongMetadata {
 // Always returns SongMetadata, even if the file has no metadata,
 // in that case the fields will be "Unknown"
 pub fn extract_metadata(file_path: &str) -> SongMetadata {
-    // 1. try to read the metadata tags from the file
-    // if successful, extract the relevant fields and return a SongMetadata struct
-    match Tag::read_from_path(file_path) {
-        Ok(tags) => SongMetadata {
-            title: tags.title().unwrap_or("Unknown").to_string(),
-            artist: tags.artist().unwrap_or("Unknown").to_string(),
-            album: tags.album().unwrap_or("Unknown").to_string(),
-            year: tags.year().map(|y| y.to_string()).unwrap_or_else(|| "----".to_string()),
-        },
-        // 2. otherwise, if failes, return a default SongMetadata with generic title
-        // and "Unknown" for artist and album, and "----" for year
-        Err(_) => SongMetadata {
-            title: format!("Local file (without metadata)"),
+    let tagged_file = match Probe::open(file_path).and_then(|p| p.read()) {
+        Ok(f) => f,
+        Err(_) => {
+            return SongMetadata {
+                title: "Local file (without metadata)".to_string(),
+                artist: "Unknown".to_string(),
+                album: "Unknown".to_string(),
+                year: "----".to_string(),
+            };
+        }
+    };
+
+    let tag_opt = tagged_file.primary_tag().or_else(|| tagged_file.first_tag());
+
+    if let Some(tag) = tag_opt {
+        SongMetadata {
+            title: tag
+                .title()
+                .map(|s| s.into_owned())
+                .unwrap_or_else(|| "Unknown".to_string()),
+            artist: tag
+                .artist()
+                .map(|s| s.into_owned())
+                .unwrap_or_else(|| "Unknown".to_string()),
+            album: tag
+                .album()
+                .map(|s| s.into_owned())
+                .unwrap_or_else(|| "Unknown".to_string()),
+            year: tag
+                .date()
+                .map(|d| d.year.to_string())
+                .unwrap_or_else(|| "----".to_string()),
+        }
+    } else {
+        SongMetadata {
+            title: "Local file (without metadata)".to_string(),
             artist: "Unknown".to_string(),
             album: "Unknown".to_string(),
             year: "----".to_string(),
-        },
+        }
     }
 }

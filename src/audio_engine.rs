@@ -20,7 +20,7 @@ pub enum AudioCommand {
 // without creating a new line of each update
 fn render_status(actual_sec: u64, total_sec: u64, status: &str) {
     print!(
-        "\r Progress: {:02}:{:02} / {:02}:{:02} [{}] [write a command: p/r/q] ",
+        "\r\x1b[2KProgress: {:02}:{:02} / {:02}:{:02} [{}] [write a command: p/r/q] ",
         actual_sec / 60,
         actual_sec % 60,
         total_sec / 60,
@@ -29,7 +29,7 @@ fn render_status(actual_sec: u64, total_sec: u64, status: &str) {
     );
 
     // (:) oh, unwrap() triggers a panic if the flush fails
-    // well, I changes it to expect()
+    // well, I change it to expect()
     // to provide a custom message in case of error
     // and "panic" is a very scary word too :D
     io::stdout().flush().expect("Error: Failed to flush stdout.");
